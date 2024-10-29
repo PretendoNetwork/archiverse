@@ -2,7 +2,7 @@
 
 ### The Biggest Miiverse Archive on the Internet
 
-View the website at [archiverse.app](https://archiverse.app)
+View the website at [archiverse.pretendo.network](https://archiverse.pretendo.network)
 
 ## About Archiverse
 
@@ -16,7 +16,3 @@ Archiverse's frontend is built using [React](https://react.dev/), [Next.js](http
 216,972,349 Replies  
 
 This data is quickly searchable on Archiverse thanks to optimized binary tree indexes applied on certain columns in each table.  The database is backed up on [internet archive](https://archive.org/details/archiverse) (Note: some modifications to this database has occured. Look over `supabase/migrations` for more details).
-
-## Contributions
-
-All contributions are welcome! The easiest way to set up the repository is to look over `archiverse` to set up the frontend, then `supabase` to set up a local copy of the database. If you have a feature request, please create an issue in this repository. All pull requests are welcome.
