@@ -1,4 +1,4 @@
-![archiverse-logo](https://github.com/kyle1373/Archiverse/assets/59634395/269a0426-87c9-48b7-a15f-cf11b910ef83)
+![archiverse-logo](https://github.com/user-attachments/assets/0ddb8ff1-422d-4800-993c-4198a1a0cddb)
 
 ### The Biggest Miiverse Archive on the Internet
 
