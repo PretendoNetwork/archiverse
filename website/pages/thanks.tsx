@@ -14,15 +14,15 @@ export default function Home() {
         </div>
         <AppreciationCard
           miiName={"Pretendo Network"}
-          subName={"The Team behind Archiverse (November 2024 - Present)"}
-          text="Acquired the project and currently maintains it."
+          subName={"The Archiverse Team"}
+          text="Currently maintains the Archiverse project."
           miiUrl={"pretendo.png"}
           socialLink={LINKS.pretendo}
         />
         <div className="border-t-[1px] border-gray" />
         <AppreciationCard
           miiName={"Kyle / SuperFX"}
-          subName={"Archiverse's Developer (June 2024 - November 2024)"}
+          subName={"Archiverse's Developer"}
           text="Built the Archiverse website you see right now."
           miiUrl={"superfx.png"}
           socialLink={LINKS.superfx}
@@ -31,7 +31,7 @@ export default function Home() {
 
         <AppreciationCard
           miiName={"luna"}
-          subName={"Archiverse's Designer (June 2024 - November 2024)"}
+          subName={"Archiverse's Designer"}
           text={
             "Created the Archiverse logo, guided Archiverse's UI design, and wrote the FAQ page content."
           }
@@ -42,9 +42,9 @@ export default function Home() {
         <AppreciationCard
           miiName={"Tim / Drastic Actions"}
           text={
-            "Developed the original Archiverse website (archiverse.guide) and ran it from January 2018 - January 2024 until Kyle / SuperFX's takeover."
+            "Developed the original Archiverse website (archiverse.guide) and ran it from 2018 - 2024 until Kyle / SuperFX's takeover."
           }
-          subName={"Archiverse's Original Creator (January 2018 - January 2024)"}
+          subName={"Archiverse's Original Creator"}
           miiUrl={"drasticactions.png"}
           socialLink={LINKS.drasticactions}
         />
