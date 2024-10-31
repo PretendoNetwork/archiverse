@@ -6,13 +6,15 @@ export const SEO_METADATA = {
 };
 
 export const LINKS = {
-  discord: "https://discord.gg/jUAWHNzMer",
-  github: "https://github.com/kyle1373/archiverse",
-  kofi: "https://ko-fi.com/archiverse",
+  discord: "https://discord.gg/pretendo",
+  github: "https://github.com/pretendonetwork/archiverse",
+  donate: "https://pretendo.network/account/login?redirect=/account/upgrade",
   drasticactions: "https://github.com/drasticactions",
   archiveteam: "https://wiki.archiveteam.org/",
   luna: "https://x.com/puppychist",
   superfx: "https://kylewade.dev",
+  pretendo: "https://pretendo.network",
+  forum: "https://forum.pretendo.network/",
 };
 
 export const SETTINGS = {

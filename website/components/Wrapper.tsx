@@ -72,7 +72,7 @@ const Wrapper = ({ children }) => {
                   <FaDiscord className="w-5 h-5 text-[#696969] hover:text-green" />
                 </Link>
                 <Link
-                  href={LINKS.kofi}
+                  href={LINKS.donate}
                   target="_blank"
                   className="mr-[21px]"
                   rel="noopener noreferrer"
@@ -111,7 +111,7 @@ const Wrapper = ({ children }) => {
               <FaDiscord className="w-5 h-5 text-[#696969] hover:text-green" />
             </Link>
             <Link
-              href={LINKS.kofi}
+              href={LINKS.donate}
               target="_blank"
               className="mr-[21px]"
               rel="noopener noreferrer"
