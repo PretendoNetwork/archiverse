@@ -16,7 +16,7 @@ const Wrapper = ({ children }) => {
                 <img
                   src={"/archiverse-logo.png"}
                   alt={"archiverse logo"}
-                  className="w-[160px] h-[29px] md:w-[208px] md:h-[37px] md:ml-0 ml-4"
+                  className="w-[160px] md:w-[208px] md:ml-0 ml-4"
                 />
               </Link>
               <div className="flex-col md:flex">
