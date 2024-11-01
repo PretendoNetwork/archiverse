@@ -15,6 +15,7 @@ export const LINKS = {
   superfx: "https://kylewade.dev",
   pretendo: "https://pretendo.network",
   forum: "https://forum.pretendo.network/",
+  gdpr: "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/exemptions/a-guide-to-the-data-protection-exemptions/",
 };
 
 export const SETTINGS = {

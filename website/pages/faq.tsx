@@ -48,14 +48,22 @@ export default function Home() {
         </Answer>
         <Question>How can I remove my profile from Archiverse?</Question>
         <Answer>
-          Every service operated by Pretendo, including Archiverse, complies with GDPR standards. To request the removal of your content on the site, including the visibility of your profile, please submit a request for data removal on the{" "}
+          Unfortunately, we have no way to verify that you actually own an account on Archiverse if you request a removal. In order to prevent abuse in deleting other people's accounts by falsely claiming ownership, we do not offer a way to remove your profile from Archiverse. Furthermore, since this is public archived data without any proof of you owning the data,{" "}
+          <Link
+            className="text-blue-600 underline hover:text-blue-500"
+            href={LINKS.gdpr}
+          >
+            it does not apply to the EU GDPR nor the UK Data Protection Act (DPA)
+          </Link>. However, we are interested in offering this feature in the future if it becomes possible.
+          <br />
+          <br />
+          We do remove content which poses a security risk to an individual, such as phone numbers, email addresses, or home addresses. If this is something you find, please submit a request for data removal on{" "}
           <Link
             className="text-blue-600 underline hover:text-blue-500"
             href={LINKS.forum}
           >
             Pretendo Forums
-          </Link>{" "}
-          with the “GDPR” tag, and your data removal request will be processed as soon as possible.
+          </Link>. Keep in mind that this only removes the data from Archiverse and NOT from the original archive hosted on Internet Archive.
         </Answer>
         <Question>Why run Archiverse?</Question>
         <Answer>
