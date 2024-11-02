@@ -1,7 +1,7 @@
 import SEO from "@/components/SEO";
 import Link from "next/link";
 import Wrapper from "@components/Wrapper";
-import { LINKS } from "@constants/constants";
+import { CONSTANTS, LINKS } from "@constants/constants";
 import { logServerStats } from "@server/logger";
 
 export default function Home() {
@@ -48,22 +48,18 @@ export default function Home() {
         </Answer>
         <Question>How can I remove my profile from Archiverse?</Question>
         <Answer>
-          Unfortunately, we have no way to verify that you actually own an account on Archiverse if you request a removal. In order to prevent abuse in deleting other people's accounts by falsely claiming ownership, we do not offer a way to remove your profile from Archiverse. Furthermore, since this is public archived data without any proof of you owning the data,{" "}
-          <Link
+          Archiverse <Link
             className="text-blue-600 underline hover:text-blue-500"
             href={LINKS.gdpr}
-          >
-            it does not apply to the EU GDPR nor the UK Data Protection Act (DPA)
-          </Link>. However, we are interested in offering this feature in the future if it becomes possible.
-          <br />
-          <br />
-          We do remove content which poses a security risk to an individual, such as phone numbers, email addresses, or home addresses. If this is something you find, please submit a request for data removal on{" "}
-          <Link
+          >does not fall under GDPR nor DPA </Link>, but if you see sensitive info on the site (like phone numbers, addresses, etc), you can request a deletion by emailing <Link
             className="text-blue-600 underline hover:text-blue-500"
-            href={LINKS.forum}
+            href={`mailto:${CONSTANTS.privacyEmail}`}
           >
-            Pretendo Forums
-          </Link>. Keep in mind that this only removes the data from Archiverse and NOT from the original archive hosted on Internet Archive.
+            {CONSTANTS.privacyEmail}
+          </Link> (note that this only removes the data from Archiverse and not from the original archive hosted on Internet Archive).
+          <br />
+          <br />
+          We do not offer account deletions otherwise because there is no reliable way to verify that you own an account on Archiverse. It is very easy for someone to impersonate as another user and delete their data, so we want to prevent this kind of abuse.
         </Answer>
         <Question>Why run Archiverse?</Question>
         <Answer>

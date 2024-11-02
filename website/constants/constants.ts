@@ -18,6 +18,10 @@ export const LINKS = {
   gdpr: "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/exemptions/a-guide-to-the-data-protection-exemptions/",
 };
 
+export const CONSTANTS = {
+  privacyEmail: "privacy@pretendo.network",
+};
+
 export const SETTINGS = {
   Maintenance: false,
 };
