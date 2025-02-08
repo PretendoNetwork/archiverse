@@ -20,6 +20,9 @@ jobs:
       packages: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Set up QEMU for Docker
         uses: docker/setup-qemu-action@v3
 
