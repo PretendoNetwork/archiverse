@@ -20,9 +20,6 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Set up QEMU for Docker
         uses: docker/setup-qemu-action@v3
 
@@ -42,7 +39,6 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          context: ./website
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
             type=raw,value=edge,enable=${{ github.ref == 'refs/heads/dev' }}
