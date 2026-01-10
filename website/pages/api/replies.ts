@@ -4,6 +4,7 @@ import {
   getCommunities,
   getHomepageDrawings,
   getPostReplies,
+  getPostRepliesAll,
   getPosts,
   searchCommunities,
 } from "@server/database";
@@ -14,10 +15,11 @@ type QueryParams = {
   post_id: string;
   page: number | string;
   sort_mode: "newest" | "oldest";
+  all?: string;
 };
 
 const validateQueryParams = (query: QueryParams): string[] => {
-  const { sort_mode, post_id, page } = query;
+  const { sort_mode, post_id, page, all } = query;
 
   const errors: string[] = [];
   const sortModes = ["newest", "oldest"];
@@ -30,7 +32,7 @@ const validateQueryParams = (query: QueryParams): string[] => {
     errors.push("Invalid post_id. Must be a non-empty string.");
   }
 
-  if (page && isNaN(Number(page))) {
+  if (all !== "true" && page && isNaN(Number(page))) {
     errors.push("Invalid page. Must be a number.");
   }
 
@@ -47,12 +49,13 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   }
   
   try {
-    const { post_id, page, sort_mode } = req.query;
+    const { post_id, page, sort_mode, all } = req.query;
 
     const queryParams: QueryParams = {
       post_id: post_id as string,
       page: page as string | number,
       sort_mode: sort_mode as "newest" | "oldest",
+      all: all as string,
     };
 
     const errors = validateQueryParams(queryParams);
@@ -61,7 +64,16 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       return res.status(400).json({ error: errors.join(", ") });
     }
 
+    const fetchAll = all === "true";
     const pageNumber = page ? parseInt(page as string, 10) : 1;
+
+    if (fetchAll) {
+      const result = await getPostRepliesAll({
+        sortMode: queryParams.sort_mode,
+        postID: post_id as string,
+      });
+      return res.status(200).json(result);
+    }
 
     const replies = await getPostReplies({
       sortMode: queryParams.sort_mode,

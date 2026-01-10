@@ -2,7 +2,7 @@ import SEO from "@/components/SEO";
 import { Community, Post, Reply, getPost } from "@server/database";
 import Wrapper from "@components/Wrapper";
 import LoadOrRetry from "@components/LoadOrRetry";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { queryAPI } from "@utils/queryAPI";
 import { numberWithCommas } from "@utils/utils";
 import Link from "next/link";
@@ -22,6 +22,7 @@ import { usePageCache } from "@hooks/usePageCache";
 import AdBanner from "@components/AdBanner";
 import { logServerStats } from "@server/logger";
 import { GetServerSidePropsContext } from "next";
+import { useRouter } from "next/router";
 
 export default function Home({
   post_id,
@@ -31,6 +32,13 @@ export default function Home({
   post: Post;
 }) {
   const { pageCache, cachePageData } = usePageCache();
+  const router = useRouter();
+  const targetReplyId =
+    typeof router.query.reply === "string" ? router.query.reply : null;
+
+  const [highlightReplyId, setHighlightReplyId] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<number | null>(null);
+  const lastConsumedReplyIdRef = useRef<string | null>(null);
 
   const [replies, setReplies] = useState<{
     data: Reply[];
@@ -39,6 +47,7 @@ export default function Home({
     currPage: number;
     showMoreCategory: "old" | "new";
     canPullMore: boolean;
+    allLoaded: boolean;
   }>(
     pageCache(`posts/${post_id}`, "replies") ?? {
       data: null,
@@ -47,6 +56,7 @@ export default function Home({
       showMoreCategory: "old", // This is only used to show where to show the loading indicator. This value is not used elsewhere. old is top. new is bottom
       currPage: 1,
       canPullMore: false,
+      allLoaded: false,
     }
   );
 
@@ -103,18 +113,127 @@ export default function Home({
       error: null,
       canPullMore: data.length === LIMIT.PostReplies,
       showMoreCategory: category,
+      allLoaded: false,
+    }));
+  };
+
+  const fetchAllRepliesForScroll = async () => {
+    if (replies.fetching) {
+      return;
+    }
+
+    setReplies((prevState) => ({
+      ...prevState,
+      fetching: true,
+      error: null,
+    }));
+
+    // Fetch a large set in a single request, then render chronologically for stable scrolling.
+    const { data, error } = await queryAPI<{
+      replies: Reply[];
+      total: number | null;
+      hasMore: boolean;
+    }>(
+      `replies?post_id=${post_id}&sort_mode=oldest&all=true`
+    );
+
+    if (error) {
+      setReplies((prevState) => ({
+        ...prevState,
+        fetching: false,
+        error: error,
+        allLoaded: false,
+      }));
+      return;
+    }
+
+    const allReplies = data?.replies ?? [];
+    const hasMore = data?.hasMore ?? false;
+    const missingTarget =
+      !!targetReplyId && !allReplies.some((r) => r.ID === targetReplyId);
+
+    setReplies((prevState) => ({
+      ...prevState,
+      data: allReplies,
+      currPage: 1,
+      fetching: false,
+      // If the target isn't present, don't fail silently.
+      error: missingTarget
+        ? `Couldn't find that reply in the loaded comments${
+            hasMore ? " yet" : ""
+          }.`
+        : null,
+      canPullMore: hasMore,
+      allLoaded: !hasMore,
+      showMoreCategory: "new",
     }));
   };
 
   useEffect(() => {
     if (!replies.data) {
-      fetchReplies(true, "newest", "old");
+      if (targetReplyId) {
+        fetchAllRepliesForScroll();
+      } else {
+        fetchReplies(true, "newest", "old");
+      }
     }
   }, []);
 
   useEffect(() => {
     cachePageData(`posts/${post_id}`, "replies", replies);
   }, [replies]);
+
+  useEffect(() => {
+    if (!targetReplyId) {
+      return;
+    }
+    if (!replies.data) {
+      return;
+    }
+
+    // Scroll once the target reply exists in the DOM.
+    const el = document.getElementById(`reply-${targetReplyId}`);
+    if (!el) {
+      return;
+    }
+
+    // If we're highlighting a new reply, cancel any previous auto-clear timer.
+    if (highlightTimeoutRef.current != null) {
+      window.clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = null;
+    }
+
+    setHighlightReplyId(targetReplyId);
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    // Clean up the URL after we've acted on it (no reload).
+    // IMPORTANT: Use history.replaceState so we don't change router.query and accidentally cancel the timer.
+    if (
+      typeof window !== "undefined" &&
+      lastConsumedReplyIdRef.current !== targetReplyId
+    ) {
+      lastConsumedReplyIdRef.current = targetReplyId;
+      const url = new URL(window.location.href);
+      url.searchParams.delete("reply");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    }
+
+    highlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightReplyId(null);
+      highlightTimeoutRef.current = null;
+    }, 2500);
+  }, [targetReplyId, replies.data?.length]);
+
+  useEffect(() => {
+    // Cleanup on unmount
+    return () => {
+      if (highlightTimeoutRef.current != null) {
+        window.clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <>
@@ -156,7 +275,21 @@ export default function Home({
             </div>
           ) : (
             <div>
-              {replies.canPullMore && replies.showMoreCategory === "old" && (
+              {replies.error && (
+                <div className="mx-4 md:mx-2 my-2 text-xs text-neutral-500">
+                  {replies.error}
+                  {targetReplyId && replies.canPullMore && (
+                    <span>
+                      {" "}
+                      Try loading more comments (e.g. “View newer comments”) to
+                      reach it.
+                    </span>
+                  )}
+                </div>
+              )}
+              {replies.canPullMore &&
+                !replies.allLoaded &&
+                replies.showMoreCategory === "old" && (
                 <div className="flex flex-col mx-[-16px]">
                   {!replies.fetching ? (
                     <>
@@ -194,8 +327,13 @@ export default function Home({
                   return (
                     <div
                       key={reply.ID + index + "div"}
+                      id={`reply-${reply.ID}`}
                       className={`px-4 md:mx-[0px] mx-[-16px] ${
                         reply.NNID === post.NNID ? "bg-[#effbe7]" : ""
+                      } ${
+                        highlightReplyId === reply.ID
+                          ? "ring-2 ring-[#5ac800] ring-inset"
+                          : ""
                       }`}
                     >
                       <ReplyCard key={reply.ID + index} reply={reply} />
@@ -205,7 +343,9 @@ export default function Home({
                     </div>
                   );
                 })}
-              {replies.canPullMore && replies.showMoreCategory === "new" && (
+              {replies.canPullMore &&
+                !replies.allLoaded &&
+                replies.showMoreCategory === "new" && (
                 <div className="flex flex-col mx-[-16px]">
                   {!replies.fetching ? (
                     <>
