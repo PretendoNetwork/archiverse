@@ -32,6 +32,8 @@ export default function Home({
   const router = useRouter();
 
   const [mounted, setMounted] = useState(false);
+  const [miiLoaded, setMiiLoaded] = useState(false);
+  const [bannerLoaded, setBannerLoaded] = useState(false);
 
   const [contentView, setContentView] = useState<"posts" | "replies">(
     viewParamProvided
@@ -258,6 +260,12 @@ export default function Home({
     setMounted(true);
   }, []);
 
+  // Prevent "old user image flash" when navigating between `/users/[user_id]`.
+  useEffect(() => {
+    setMiiLoaded(false);
+    setBannerLoaded(!user?.BannerUrl);
+  }, [user?.NNID, user?.MiiUrl, user?.BannerUrl]);
+
   // CRITICAL: when navigating between `/users/[user_id]` routes, Next.js reuses the same page component.
   // Reset state + refetch so we never show the previous user's profile feed.
   useEffect(() => {
@@ -350,21 +358,41 @@ export default function Home({
       <Wrapper>
         {user.BannerUrl && (
           <div className="flex bg-[#f6f6f6] text-neutral-700 font-semibold border-b-[1px] border-gray mt-[-16px] mx-[-16px] text-base">
+            {!bannerLoaded && (
+              <div className="w-full md:h-[195px] sm:h-[200px] h-[140px] bg-[#f6f6f6] flex items-center justify-center">
+                <Loading />
+              </div>
+            )}
             <img
+              key={user.BannerUrl}
               src={user?.BannerUrl}
-              className="w-full md:h-[195px] sm:h-[200px] h-[140px] object-cover object-center"
+              className={`w-full md:h-[195px] sm:h-[200px] h-[140px] object-cover object-center ${
+                !bannerLoaded ? "hidden" : ""
+              }`}
+              onLoad={() => setBannerLoaded(true)}
+              onError={() => setBannerLoaded(true)}
             />
           </div>
         )}
         <div className={`relative ${user.BannerUrl && "mt-[-12px]"} flex`}>
           <div className="bg-white inline-block border-[1px] border-gray rounded-md">
+            {!miiLoaded && (
+              <div className="w-16 h-16 rounded-md bg-white flex items-center justify-center">
+                <Loading />
+              </div>
+            )}
             <img
+              key={user.MiiUrl}
               src={user.MiiUrl}
-              className="w-16 h-16 object-cover rounded-md"
+              className={`w-16 h-16 object-cover rounded-md ${
+                !miiLoaded ? "hidden" : ""
+              }`}
               alt={user.MiiName + " Icon"}
+              onLoad={() => setMiiLoaded(true)}
               onError={({ currentTarget }) => {
                 currentTarget.onerror = null; // prevents looping
                 currentTarget.src = IMAGES.unknownMii;
+                setMiiLoaded(true);
               }}
             />
           </div>
@@ -618,8 +646,19 @@ export default function Home({
 
                   <div className="border-t-[1px] border-gray mx-4" />
                   <Link
-                    href={`/posts/${item.reply.ReplyingToID}?reply=${item.reply.ID}`}
+                    href={`/posts/${item.reply.ReplyingToID}`}
                     className="block"
+                    onClick={() => {
+                      if (typeof window === "undefined") return;
+                      try {
+                        window.sessionStorage.setItem(
+                          `scrollToReply:${item.reply.ReplyingToID}`,
+                          item.reply.ID
+                        );
+                      } catch {
+                        // ignore (storage disabled)
+                      }
+                    }}
                   >
                     <ReplyCard reply={item.reply} className="px-4" />
                   </Link>

@@ -33,12 +33,12 @@ export default function Home({
 }) {
   const { pageCache, cachePageData } = usePageCache();
   const router = useRouter();
-  const targetReplyId =
-    typeof router.query.reply === "string" ? router.query.reply : null;
 
   const [highlightReplyId, setHighlightReplyId] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<number | null>(null);
-  const lastConsumedReplyIdRef = useRef<string | null>(null);
+  const [scrollTargetReplyId, setScrollTargetReplyId] = useState<string | null>(
+    null
+  );
 
   const [replies, setReplies] = useState<{
     data: Reply[];
@@ -150,7 +150,8 @@ export default function Home({
     const allReplies = data?.replies ?? [];
     const hasMore = data?.hasMore ?? false;
     const missingTarget =
-      !!targetReplyId && !allReplies.some((r) => r.ID === targetReplyId);
+      !!scrollTargetReplyId &&
+      !allReplies.some((r) => r.ID === scrollTargetReplyId);
 
     setReplies((prevState) => ({
       ...prevState,
@@ -170,21 +171,35 @@ export default function Home({
   };
 
   useEffect(() => {
+    // Only scroll when we navigated from a profile reply click.
+    if (typeof window !== "undefined") {
+      try {
+        const key = `scrollToReply:${post_id}`;
+        const stored = window.sessionStorage.getItem(key);
+        if (stored) {
+          window.sessionStorage.removeItem(key); // one-shot so back/forward doesn't re-trigger
+          setScrollTargetReplyId(stored);
+        }
+      } catch {
+        // ignore (storage disabled)
+      }
+    }
+
     if (!replies.data) {
-      if (targetReplyId) {
+      if (scrollTargetReplyId) {
         fetchAllRepliesForScroll();
       } else {
         fetchReplies(true, "newest", "old");
       }
     }
-  }, []);
+  }, [scrollTargetReplyId]);
 
   useEffect(() => {
     cachePageData(`posts/${post_id}`, "replies", replies);
   }, [replies]);
 
   useEffect(() => {
-    if (!targetReplyId) {
+    if (!scrollTargetReplyId) {
       return;
     }
     if (!replies.data) {
@@ -192,7 +207,7 @@ export default function Home({
     }
 
     // Scroll once the target reply exists in the DOM.
-    const el = document.getElementById(`reply-${targetReplyId}`);
+    const el = document.getElementById(`reply-${scrollTargetReplyId}`);
     if (!el) {
       return;
     }
@@ -203,28 +218,16 @@ export default function Home({
       highlightTimeoutRef.current = null;
     }
 
-    setHighlightReplyId(targetReplyId);
+    setHighlightReplyId(scrollTargetReplyId);
     requestAnimationFrame(() => {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     });
-
-    // Clean up the URL after we've acted on it (no reload).
-    // IMPORTANT: Use history.replaceState so we don't change router.query and accidentally cancel the timer.
-    if (
-      typeof window !== "undefined" &&
-      lastConsumedReplyIdRef.current !== targetReplyId
-    ) {
-      lastConsumedReplyIdRef.current = targetReplyId;
-      const url = new URL(window.location.href);
-      url.searchParams.delete("reply");
-      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
-    }
 
     highlightTimeoutRef.current = window.setTimeout(() => {
       setHighlightReplyId(null);
       highlightTimeoutRef.current = null;
     }, 2500);
-  }, [targetReplyId, replies.data?.length]);
+  }, [scrollTargetReplyId, replies.data?.length]);
 
   useEffect(() => {
     // Cleanup on unmount
@@ -278,7 +281,7 @@ export default function Home({
               {replies.error && (
                 <div className="mx-4 md:mx-2 my-2 text-xs text-neutral-500">
                   {replies.error}
-                  {targetReplyId && replies.canPullMore && (
+                  {scrollTargetReplyId && replies.canPullMore && (
                     <span>
                       {" "}
                       Try loading more comments (e.g. “View newer comments”) to
