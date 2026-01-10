@@ -330,11 +330,6 @@ export default function Home({
 
   const setView = (view: "posts" | "replies") => {
     setContentView(view);
-    router.replace(
-      { pathname: router.pathname, query: { ...router.query, view } },
-      undefined,
-      { shallow: true }
-    );
 
     if (view === "posts") {
       if (!posts.data.length) {
