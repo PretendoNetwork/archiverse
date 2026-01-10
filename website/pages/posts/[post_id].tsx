@@ -2,7 +2,7 @@ import SEO from "@/components/SEO";
 import { Community, Post, Reply, getPost } from "@server/database";
 import Wrapper from "@components/Wrapper";
 import LoadOrRetry from "@components/LoadOrRetry";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { queryAPI } from "@utils/queryAPI";
 import { numberWithCommas } from "@utils/utils";
 import Link from "next/link";
@@ -37,6 +37,8 @@ export default function Home({
     typeof router.query.reply === "string" ? router.query.reply : null;
 
   const [highlightReplyId, setHighlightReplyId] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<number | null>(null);
+  const lastConsumedReplyIdRef = useRef<string | null>(null);
 
   const [replies, setReplies] = useState<{
     data: Reply[];
@@ -127,7 +129,11 @@ export default function Home({
     }));
 
     // Fetch a large set in a single request, then render chronologically for stable scrolling.
-    const { data, error } = await queryAPI<Reply[]>(
+    const { data, error } = await queryAPI<{
+      replies: Reply[];
+      total: number | null;
+      hasMore: boolean;
+    }>(
       `replies?post_id=${post_id}&sort_mode=oldest&all=true`
     );
 
@@ -141,15 +147,25 @@ export default function Home({
       return;
     }
 
+    const allReplies = data?.replies ?? [];
+    const hasMore = data?.hasMore ?? false;
+    const missingTarget =
+      !!targetReplyId && !allReplies.some((r) => r.ID === targetReplyId);
+
     setReplies((prevState) => ({
       ...prevState,
-      data: data ?? [],
+      data: allReplies,
       currPage: 1,
       fetching: false,
-      error: null,
-      canPullMore: false,
-      allLoaded: true,
-      showMoreCategory: "old",
+      // If the target isn't present, don't fail silently.
+      error: missingTarget
+        ? `Couldn't find that reply in the loaded comments${
+            hasMore ? " yet" : ""
+          }.`
+        : null,
+      canPullMore: hasMore,
+      allLoaded: !hasMore,
+      showMoreCategory: "new",
     }));
   };
 
@@ -181,14 +197,43 @@ export default function Home({
       return;
     }
 
+    // If we're highlighting a new reply, cancel any previous auto-clear timer.
+    if (highlightTimeoutRef.current != null) {
+      window.clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = null;
+    }
+
     setHighlightReplyId(targetReplyId);
     requestAnimationFrame(() => {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     });
 
-    const t = window.setTimeout(() => setHighlightReplyId(null), 2500);
-    return () => window.clearTimeout(t);
+    // Clean up the URL after we've acted on it (no reload).
+    // IMPORTANT: Use history.replaceState so we don't change router.query and accidentally cancel the timer.
+    if (
+      typeof window !== "undefined" &&
+      lastConsumedReplyIdRef.current !== targetReplyId
+    ) {
+      lastConsumedReplyIdRef.current = targetReplyId;
+      const url = new URL(window.location.href);
+      url.searchParams.delete("reply");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    }
+
+    highlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightReplyId(null);
+      highlightTimeoutRef.current = null;
+    }, 2500);
   }, [targetReplyId, replies.data?.length]);
+
+  useEffect(() => {
+    // Cleanup on unmount
+    return () => {
+      if (highlightTimeoutRef.current != null) {
+        window.clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <>
@@ -230,6 +275,18 @@ export default function Home({
             </div>
           ) : (
             <div>
+              {replies.error && (
+                <div className="mx-4 md:mx-2 my-2 text-xs text-neutral-500">
+                  {replies.error}
+                  {targetReplyId && replies.canPullMore && (
+                    <span>
+                      {" "}
+                      Try loading more comments (e.g. “View newer comments”) to
+                      reach it.
+                    </span>
+                  )}
+                </div>
+              )}
               {replies.canPullMore &&
                 !replies.allLoaded &&
                 replies.showMoreCategory === "old" && (

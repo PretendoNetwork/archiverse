@@ -4,6 +4,7 @@ import {
   getCommunities,
   getHomepageDrawings,
   getPostReplies,
+  getPostRepliesAll,
   getPosts,
   searchCommunities,
 } from "@server/database";
@@ -66,12 +67,18 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     const fetchAll = all === "true";
     const pageNumber = page ? parseInt(page as string, 10) : 1;
 
-    // Single query "all" mode (up to a large cap) for scroll-to-reply behavior.
+    if (fetchAll) {
+      const result = await getPostRepliesAll({
+        sortMode: queryParams.sort_mode,
+        postID: post_id as string,
+      });
+      return res.status(200).json(result);
+    }
+
     const replies = await getPostReplies({
       sortMode: queryParams.sort_mode,
       postID: post_id as string,
-      page: fetchAll ? 1 : pageNumber,
-      limit: fetchAll ? 10000 : undefined,
+      page: pageNumber,
     });
 
     return res.status(200).json(replies);

@@ -102,6 +102,48 @@ export const getPostReplies = async ({
   return replies;
 };
 
+export type GetPostRepliesAllResult = {
+  replies: Reply[];
+  total: number | null;
+  hasMore: boolean;
+};
+
+export const getPostRepliesAll = async ({
+  postID,
+  sortMode,
+  max = 5000,
+}: {
+  postID: string;
+  sortMode: "newest" | "oldest";
+  max?: number;
+}): Promise<GetPostRepliesAllResult> => {
+  // Fetch in a single query with an upper bound. If PostgREST/Supabase truncates results
+  // (e.g., max_rows), `total` will still let us detect that the response is incomplete.
+  const { data, error, count } = await supabaseAdmin
+    .from("Replies")
+    .select(
+      "Id, EmpathyCount, Feeling, GameCommunityIconUri, InReplyToId, GameCommunityTitle, GameId, IconUri, ImageUri, IsPlayed, IsSpoiler, PostedDate, ScreenName, ScreenShotUri, Text, TitleId, NNID, HideRequested, WarcLocation",
+      { count: "exact" }
+    )
+    .eq("InReplyToId", postID)
+    .range(0, Math.max(0, max - 1))
+    .order("PostedDate", { ascending: sortMode === "oldest" });
+
+  if (error) {
+    console.log(error.message);
+    throw new Error(error.message);
+  }
+
+  const replies: Reply[] = [];
+  data?.map((value) => replies.push(convertReply(value)));
+
+  const total = typeof count === "number" ? count : null;
+  const hasMore =
+    total != null ? total > replies.length : replies.length === max;
+
+  return { replies, total, hasMore };
+};
+
 export const searchPosts = async ({ query }: { query: string }) => {
   const { data, error } = await supabaseAdmin.rpc("search_posts", {
     keyword: query?.toLowerCase(),
