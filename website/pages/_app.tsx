@@ -126,8 +126,8 @@ function MyApp({ Component, pageProps }: AppProps) {
       {process.env.NODE_ENV === "production" && (
         <Script
           async
-          src={process.env.NEXT_PUBLIC_UMAMI_URL}
-          data-website-id={process.env.NEXT_PUBLIC_UMAMI_ID}
+          src={'https://stats.superfx.dev/script.js'}
+          data-website-id={'4b461fac-17ee-49ed-8c67-76a1d7e846e7'}
         />
       )}
       <ToastContainer />

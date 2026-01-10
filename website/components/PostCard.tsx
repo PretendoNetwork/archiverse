@@ -94,7 +94,7 @@ const PostCard = ({
   if (variant === "list" || variant === "carossel") {
     return (
       <div
-        className={`w-full md:px-2 ${className} ${
+        className={`w-full ${className} ${
           variant === "list" ? "mt-3" : ""
         }`}
       >

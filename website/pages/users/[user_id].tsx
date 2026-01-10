@@ -51,6 +51,22 @@ export default function Home({
     pageCache(`users/${user_id}`, "showMore") ?? false
   );
 
+  const initialPostsState = {
+    data: [] as Post[],
+    fetching: true,
+    error: null,
+    currPage: 1,
+    canLoadMore: true,
+  };
+
+  const initialRepliesState = {
+    data: [] as UserReplyFeedItem[],
+    fetching: true,
+    error: null,
+    currPage: 1,
+    canLoadMore: true,
+  };
+
   const [posts, setPosts] = useState<{
     data: Post[];
     fetching: boolean;
@@ -59,11 +75,7 @@ export default function Home({
     canLoadMore: boolean;
   }>(
     pageCache(`users/${user_id}`, "posts") ?? {
-      data: [],
-      fetching: true,
-      error: null,
-      currPage: 1,
-      canLoadMore: true,
+      ...initialPostsState,
     }
   );
 
@@ -75,11 +87,7 @@ export default function Home({
     canLoadMore: boolean;
   }>(
     pageCache(`users/${user_id}`, "replies") ?? {
-      data: [],
-      fetching: true,
-      error: null,
-      currPage: 1,
-      canLoadMore: true,
+      ...initialRepliesState,
     }
   );
 
@@ -249,6 +257,52 @@ export default function Home({
     }
     setMounted(true);
   }, []);
+
+  // CRITICAL: when navigating between `/users/[user_id]` routes, Next.js reuses the same page component.
+  // Reset state + refetch so we never show the previous user's profile feed.
+  useEffect(() => {
+    const cachePath = `users/${user_id}`;
+
+    // If this navigation came from back/forward, restore cached UI state instead of wiping it.
+    const cachedPosts = pageCache(cachePath, "posts");
+    const cachedReplies = pageCache(cachePath, "replies");
+    const cachedSelected = pageCache(cachePath, "selected");
+    const cachedReplySelected = pageCache(cachePath, "replySelected");
+    const cachedShowMore = pageCache(cachePath, "showMore");
+    const cachedContentView = pageCache(cachePath, "contentView");
+
+    const nextContentView = viewParamProvided
+      ? initialView
+      : cachedContentView ?? "posts";
+
+    setContentView(nextContentView);
+    setSelected(cachedSelected ?? "recent");
+    setReplySelected(cachedReplySelected ?? "newest");
+    setShowMore(cachedShowMore ?? false);
+
+    if (cachedPosts) {
+      setPosts(cachedPosts);
+    } else {
+      setPosts({ ...initialPostsState });
+    }
+
+    if (cachedReplies) {
+      setReplies(cachedReplies);
+    } else {
+      setReplies({ ...initialRepliesState });
+    }
+  }, [user_id]);
+
+  useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+    if (contentView === "posts") {
+      fetchPosts({ restart: true, ignoreLoading: true });
+    } else {
+      fetchReplies({ restart: true, ignoreLoading: true });
+    }
+  }, [user_id, contentView]);
 
   useEffect(() => {
     if (mounted) {
