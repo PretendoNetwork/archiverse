@@ -1,6 +1,5 @@
 import Image from "next/image";
 import SEO from "@/components/SEO";
-import styles from "./index.module.css";
 import Link from "next/link";
 import {
   Community,
