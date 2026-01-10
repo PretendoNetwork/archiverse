@@ -22,6 +22,7 @@ import { usePageCache } from "@hooks/usePageCache";
 import AdBanner from "@components/AdBanner";
 import { logServerStats } from "@server/logger";
 import { GetServerSidePropsContext } from "next";
+import { useRouter } from "next/router";
 
 export default function Home({
   post_id,
@@ -31,6 +32,11 @@ export default function Home({
   post: Post;
 }) {
   const { pageCache, cachePageData } = usePageCache();
+  const router = useRouter();
+  const targetReplyId =
+    typeof router.query.reply === "string" ? router.query.reply : null;
+
+  const [highlightReplyId, setHighlightReplyId] = useState<string | null>(null);
 
   const [replies, setReplies] = useState<{
     data: Reply[];
@@ -39,6 +45,7 @@ export default function Home({
     currPage: number;
     showMoreCategory: "old" | "new";
     canPullMore: boolean;
+    allLoaded: boolean;
   }>(
     pageCache(`posts/${post_id}`, "replies") ?? {
       data: null,
@@ -47,6 +54,7 @@ export default function Home({
       showMoreCategory: "old", // This is only used to show where to show the loading indicator. This value is not used elsewhere. old is top. new is bottom
       currPage: 1,
       canPullMore: false,
+      allLoaded: false,
     }
   );
 
@@ -103,18 +111,84 @@ export default function Home({
       error: null,
       canPullMore: data.length === LIMIT.PostReplies,
       showMoreCategory: category,
+      allLoaded: false,
+    }));
+  };
+
+  const fetchAllRepliesForScroll = async () => {
+    if (replies.fetching) {
+      return;
+    }
+
+    setReplies((prevState) => ({
+      ...prevState,
+      fetching: true,
+      error: null,
+    }));
+
+    // Fetch a large set in a single request, then render chronologically for stable scrolling.
+    const { data, error } = await queryAPI<Reply[]>(
+      `replies?post_id=${post_id}&sort_mode=oldest&all=true`
+    );
+
+    if (error) {
+      setReplies((prevState) => ({
+        ...prevState,
+        fetching: false,
+        error: error,
+        allLoaded: false,
+      }));
+      return;
+    }
+
+    setReplies((prevState) => ({
+      ...prevState,
+      data: data ?? [],
+      currPage: 1,
+      fetching: false,
+      error: null,
+      canPullMore: false,
+      allLoaded: true,
+      showMoreCategory: "old",
     }));
   };
 
   useEffect(() => {
     if (!replies.data) {
-      fetchReplies(true, "newest", "old");
+      if (targetReplyId) {
+        fetchAllRepliesForScroll();
+      } else {
+        fetchReplies(true, "newest", "old");
+      }
     }
   }, []);
 
   useEffect(() => {
     cachePageData(`posts/${post_id}`, "replies", replies);
   }, [replies]);
+
+  useEffect(() => {
+    if (!targetReplyId) {
+      return;
+    }
+    if (!replies.data) {
+      return;
+    }
+
+    // Scroll once the target reply exists in the DOM.
+    const el = document.getElementById(`reply-${targetReplyId}`);
+    if (!el) {
+      return;
+    }
+
+    setHighlightReplyId(targetReplyId);
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    const t = window.setTimeout(() => setHighlightReplyId(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [targetReplyId, replies.data?.length]);
 
   return (
     <>
@@ -156,7 +230,9 @@ export default function Home({
             </div>
           ) : (
             <div>
-              {replies.canPullMore && replies.showMoreCategory === "old" && (
+              {replies.canPullMore &&
+                !replies.allLoaded &&
+                replies.showMoreCategory === "old" && (
                 <div className="flex flex-col mx-[-16px]">
                   {!replies.fetching ? (
                     <>
@@ -194,8 +270,13 @@ export default function Home({
                   return (
                     <div
                       key={reply.ID + index + "div"}
+                      id={`reply-${reply.ID}`}
                       className={`px-4 md:mx-[0px] mx-[-16px] ${
                         reply.NNID === post.NNID ? "bg-[#effbe7]" : ""
+                      } ${
+                        highlightReplyId === reply.ID
+                          ? "ring-2 ring-[#5ac800] ring-inset"
+                          : ""
                       }`}
                     >
                       <ReplyCard key={reply.ID + index} reply={reply} />
@@ -205,7 +286,9 @@ export default function Home({
                     </div>
                   );
                 })}
-              {replies.canPullMore && replies.showMoreCategory === "new" && (
+              {replies.canPullMore &&
+                !replies.allLoaded &&
+                replies.showMoreCategory === "new" && (
                 <div className="flex flex-col mx-[-16px]">
                   {!replies.fetching ? (
                     <>

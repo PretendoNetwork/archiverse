@@ -15,6 +15,8 @@ import { logServerStats } from "@server/logger";
 import ReplyCard from "@components/ReplyCard";
 import { useRouter } from "next/router";
 
+type UserReplyFeedItem = { reply: Reply; post: Post | null };
+
 export default function Home({
   user,
   user_id,
@@ -66,7 +68,7 @@ export default function Home({
   );
 
   const [replies, setReplies] = useState<{
-    data: Reply[];
+    data: UserReplyFeedItem[];
     fetching: boolean;
     error: string;
     currPage: number;
@@ -173,8 +175,8 @@ export default function Home({
       }));
     }
 
-    const queryUrl = `userReplies?user_id=${user.NNID}&page=${page}&sort_mode=${replySelected}`;
-    const { data, error } = await queryAPI<Reply[]>(queryUrl);
+    const queryUrl = `userReplies?user_id=${user.NNID}&page=${page}&sort_mode=${replySelected}&include_post=true`;
+    const { data, error } = await queryAPI<UserReplyFeedItem[]>(queryUrl);
 
     if (error && page > 1) {
       page = page - 1;
@@ -526,21 +528,48 @@ export default function Home({
               </button>
             </div>
 
-            {replies.data?.map((reply, index) => {
+            {replies.data?.map((item, index) => {
               return (
-                <Link
-                  key={reply.ID + index + "ReplyCard NNID " + reply.NNID}
-                  href={`/posts/${reply.ReplyingToID}`}
+                <div
+                  key={item.reply.ID + index + "ReplyFeedItem"}
+                  className="bg-white border-t-[1px] border-gray mb-3 mx-[-16px]"
                 >
-                  <ReplyCard
-                    key={reply.ID + index + "ReplyCard"}
-                    reply={reply}
-                    className={`${
-                      index !== replies.data.length - 1 &&
-                      "border-b-[1px] border-gray"
-                    }`}
-                  />
-                </Link>
+                  <div className="flex items-center justify-between bg-[#f6f6f6] px-4 py-2">
+                    <h3 className="text-[10px] text-neutral-500 font-semibold">
+                      Replying to
+                    </h3>
+                    {item.reply.ReplyingToID && (
+                      <Link
+                        href={`/posts/${item.reply.ReplyingToID}`}
+                        className="text-[10px] text-green hover:underline font-semibold"
+                      >
+                        View Post
+                      </Link>
+                    )}
+                  </div>
+
+                  {item.post && !item.post.DoNotShow ? (
+                    <Link href={`/posts/${item.post.ID}`} className="block px-4">
+                      <PostCard
+                        post={item.post}
+                        variant="list"
+                        className="px-0 md:px-0"
+                      />
+                    </Link>
+                  ) : (
+                    <div className="px-2 py-3 text-xs text-neutral-500">
+                      Original post not found.
+                    </div>
+                  )}
+
+                  <div className="border-t-[1px] border-gray mx-4" />
+                  <Link
+                    href={`/posts/${item.reply.ReplyingToID}?reply=${item.reply.ID}`}
+                    className="block"
+                  >
+                    <ReplyCard reply={item.reply} className="px-4" />
+                  </Link>
+                </div>
               );
             })}
 

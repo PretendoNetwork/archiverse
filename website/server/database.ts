@@ -517,6 +517,63 @@ export const getUserReplies = async ({
   return replies;
 };
 
+export type UserReplyFeedItem = { reply: Reply; post: Post | null };
+
+const getPostsByIDs = async (postIDs: string[]): Promise<Map<string, Post>> => {
+  const map = new Map<string, Post>();
+  const ids = _.uniq(postIDs.filter(Boolean));
+  if (!ids.length) {
+    return map;
+  }
+
+  // PostgREST can have practical limits on `in(...)` size; chunk to be safe.
+  const chunks = _.chunk(ids, 100);
+
+  for (const chunk of chunks) {
+    const { data, error } = await supabaseAdmin
+      .from("Posts")
+      .select(
+        "Id, EmpathyCount, Feeling, GameCommunityIconUri, GameCommunityTitle, GameId, IconUri, ImageUri, IsPlayed, IsSpoiler, PostedDate, ReplyCount, ScreenName, ScreenShotUri, Text, Title, TitleId, VideoUrl, NNID, HideRequested, WarcLocation"
+      )
+      .in("Id", chunk);
+
+    if (error) {
+      console.log(error.message);
+      throw new Error(error.message);
+    }
+
+    data?.forEach((row) => {
+      const converted = convertPost(row);
+      if (converted?.ID) {
+        map.set(converted.ID, converted);
+      }
+    });
+  }
+
+  return map;
+};
+
+export const getUserRepliesWithPosts = async ({
+  NNID,
+  sortMode,
+  limit = LIMIT.UserReplies,
+  page = 1,
+}: {
+  NNID: string;
+  sortMode: "newest" | "oldest" | "popular";
+  limit?: number;
+  page?: number;
+}): Promise<UserReplyFeedItem[]> => {
+  const replies = await getUserReplies({ NNID, sortMode, limit, page });
+  const postIDs = replies.map((r) => r.ReplyingToID).filter(Boolean);
+  const postsByID = await getPostsByIDs(postIDs);
+
+  return replies.map((reply) => ({
+    reply,
+    post: reply.ReplyingToID ? postsByID.get(reply.ReplyingToID) ?? null : null,
+  }));
+};
+
 export type Post = {
   ID: string;
   MiiName: string;

@@ -1,5 +1,5 @@
 import { SETTINGS } from "@constants/constants";
-import { getUserReplies } from "@server/database";
+import { getUserReplies, getUserRepliesWithPosts } from "@server/database";
 import { logServerStats } from "@server/logger";
 import type { NextApiRequest, NextApiResponse } from "next";
 
@@ -7,6 +7,7 @@ type QueryParams = {
   user_id?: string;
   page?: string | number;
   sort_mode?: "newest" | "oldest" | "popular";
+  include_post?: string;
 };
 
 const validateQueryParams = (query: QueryParams): string[] => {
@@ -38,12 +39,13 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   }
 
   try {
-    const { user_id, page, sort_mode } = req.query;
+    const { user_id, page, sort_mode, include_post } = req.query;
 
     const queryParams: QueryParams = {
       user_id: user_id as string,
       page: page as string | number,
       sort_mode: sort_mode as "newest" | "oldest" | "popular",
+      include_post: include_post as string,
     };
 
     const errors = validateQueryParams(queryParams);
@@ -53,11 +55,19 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     const pageNumber = page ? parseInt(page as string, 10) : 1;
 
-    const replies = await getUserReplies({
-      NNID: queryParams.user_id!,
-      sortMode: queryParams.sort_mode!,
-      page: pageNumber,
-    });
+    const includePost = include_post === "true";
+
+    const replies = includePost
+      ? await getUserRepliesWithPosts({
+          NNID: queryParams.user_id!,
+          sortMode: queryParams.sort_mode!,
+          page: pageNumber,
+        })
+      : await getUserReplies({
+          NNID: queryParams.user_id!,
+          sortMode: queryParams.sort_mode!,
+          page: pageNumber,
+        });
 
     return res.status(200).json(replies);
   } catch (e) {
