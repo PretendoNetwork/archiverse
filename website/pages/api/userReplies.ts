@@ -8,6 +8,7 @@ type QueryParams = {
   page?: string | number;
   sort_mode?: "newest" | "oldest" | "popular";
   include_post?: string;
+  other_posts_only?: string;
 };
 
 const validateQueryParams = (query: QueryParams): string[] => {
@@ -39,13 +40,15 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   }
 
   try {
-    const { user_id, page, sort_mode, include_post } = req.query;
+    const { user_id, page, sort_mode, include_post, other_posts_only } =
+      req.query;
 
     const queryParams: QueryParams = {
       user_id: user_id as string,
       page: page as string | number,
       sort_mode: sort_mode as "newest" | "oldest" | "popular",
       include_post: include_post as string,
+      other_posts_only: other_posts_only as string,
     };
 
     const errors = validateQueryParams(queryParams);
@@ -56,12 +59,14 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     const pageNumber = page ? parseInt(page as string, 10) : 1;
 
     const includePost = include_post === "true";
+    const otherPostsOnly = other_posts_only === "true";
 
     const replies = includePost
       ? await getUserRepliesWithPosts({
           NNID: queryParams.user_id!,
           sortMode: queryParams.sort_mode!,
           page: pageNumber,
+          otherPostsOnly,
         })
       : await getUserReplies({
           NNID: queryParams.user_id!,

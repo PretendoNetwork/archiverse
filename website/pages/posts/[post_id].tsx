@@ -39,6 +39,7 @@ export default function Home({
   const [scrollTargetReplyId, setScrollTargetReplyId] = useState<string | null>(
     null
   );
+  const [checkedScrollTarget, setCheckedScrollTarget] = useState(false);
 
   const [replies, setReplies] = useState<{
     data: Reply[];
@@ -184,15 +185,34 @@ export default function Home({
         // ignore (storage disabled)
       }
     }
+    setCheckedScrollTarget(true);
+  }, [post_id]);
 
-    if (!replies.data) {
-      if (scrollTargetReplyId) {
-        fetchAllRepliesForScroll();
-      } else {
-        fetchReplies(true, "newest", "old");
-      }
+  useEffect(() => {
+    // Initial load: wait until we've checked sessionStorage so we don't accidentally start the paginated fetch.
+    if (!checkedScrollTarget) {
+      return;
     }
-  }, [scrollTargetReplyId]);
+    if (replies.data) {
+      return;
+    }
+
+    if (scrollTargetReplyId) {
+      fetchAllRepliesForScroll();
+    } else {
+      fetchReplies(true, "newest", "old");
+    }
+  }, [checkedScrollTarget, scrollTargetReplyId]);
+
+  useEffect(() => {
+    // If we first loaded paginated replies but then discover we need to scroll to a specific reply,
+    // upgrade to the "fetch all" path to guarantee the target is in the DOM.
+    if (!checkedScrollTarget) return;
+    if (!scrollTargetReplyId) return;
+    if (!replies.data) return;
+    if (replies.allLoaded) return;
+    fetchAllRepliesForScroll();
+  }, [checkedScrollTarget, scrollTargetReplyId]);
 
   useEffect(() => {
     cachePageData(`posts/${post_id}`, "replies", replies);

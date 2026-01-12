@@ -49,6 +49,10 @@ export default function Home({
     "newest" | "popular" | "oldest"
   >(pageCache(`users/${user_id}`, "replySelected") ?? "newest");
 
+  const [onlyRepliesToOthersPosts, setOnlyRepliesToOthersPosts] = useState(
+    pageCache(`users/${user_id}`, "onlyRepliesToOthersPosts") ?? false
+  );
+
   const [showMore, setShowMore] = useState(
     pageCache(`users/${user_id}`, "showMore") ?? false
   );
@@ -163,7 +167,9 @@ export default function Home({
     restart?: boolean;
     ignoreLoading?: boolean;
   }) => {
-    if (replies.fetching && !ignoreLoading) {
+    // Allow "restart" to go through even if a previous request is in-flight,
+    // otherwise toggling filters can get stuck showing stale data.
+    if (replies.fetching && !ignoreLoading && !restart) {
       return;
     }
     let page = replies.currPage + 1;
@@ -185,7 +191,8 @@ export default function Home({
       }));
     }
 
-    const queryUrl = `userReplies?user_id=${user.NNID}&page=${page}&sort_mode=${replySelected}&include_post=true`;
+    const otherPostsOnly = onlyRepliesToOthersPosts ? "&other_posts_only=true" : "";
+    const queryUrl = `userReplies?user_id=${user.NNID}&page=${page}&sort_mode=${replySelected}&include_post=true${otherPostsOnly}`;
     const { data, error } = await queryAPI<UserReplyFeedItem[]>(queryUrl);
 
     if (error && page > 1) {
@@ -245,10 +252,23 @@ export default function Home({
     cachePageData(`users/${user_id}`, "contentView", contentView);
     cachePageData(`users/${user_id}`, "selected", selected);
     cachePageData(`users/${user_id}`, "replySelected", replySelected);
+    cachePageData(
+      `users/${user_id}`,
+      "onlyRepliesToOthersPosts",
+      onlyRepliesToOthersPosts
+    );
     cachePageData(`users/${user_id}`, "showMore", showMore);
     cachePageData(`users/${user_id}`, "posts", posts);
     cachePageData(`users/${user_id}`, "replies", replies);
-  }, [posts, replies, contentView, showMore, selected, replySelected]);
+  }, [
+    posts,
+    replies,
+    contentView,
+    showMore,
+    selected,
+    replySelected,
+    onlyRepliesToOthersPosts,
+  ]);
 
   useEffect(() => {
     if (!posts.data.length) {
@@ -276,6 +296,10 @@ export default function Home({
     const cachedReplies = pageCache(cachePath, "replies");
     const cachedSelected = pageCache(cachePath, "selected");
     const cachedReplySelected = pageCache(cachePath, "replySelected");
+    const cachedOnlyRepliesToOthersPosts = pageCache(
+      cachePath,
+      "onlyRepliesToOthersPosts"
+    );
     const cachedShowMore = pageCache(cachePath, "showMore");
     const cachedContentView = pageCache(cachePath, "contentView");
 
@@ -286,6 +310,7 @@ export default function Home({
     setContentView(nextContentView);
     setSelected(cachedSelected ?? "recent");
     setReplySelected(cachedReplySelected ?? "newest");
+    setOnlyRepliesToOthersPosts(cachedOnlyRepliesToOthersPosts ?? false);
     setShowMore(cachedShowMore ?? false);
 
     if (cachedPosts) {
@@ -326,7 +351,7 @@ export default function Home({
         fetchReplies({ restart: true });
       }
     }
-  }, [replySelected]);
+  }, [replySelected, onlyRepliesToOthersPosts]);
 
   const setView = (view: "posts" | "replies") => {
     setContentView(view);
@@ -578,30 +603,66 @@ export default function Home({
 
         {contentView === "replies" && (
           <>
-            <div className="flex mb-4">
+            <div className="flex mb-2">
+                <button
+                  className={`rounded-l-md border-[1px] border-r-[.5px] ${getButtonStyles(
+                    replySelected === "newest"
+                  )}`}
+                  onClick={() => setReplySelected("newest")}
+                >
+                  Newest
+                </button>
+                <button
+                  className={`border-[1px] ${getButtonStyles(
+                    replySelected === "oldest"
+                  )}`}
+                  onClick={() => setReplySelected("oldest")}
+                >
+                  Oldest
+                </button>
+                <button
+                  className={`rounded-r-md border-[1px] border-l-[.5px] ${getButtonStyles(
+                    replySelected === "popular"
+                  )}`}
+                  onClick={() => setReplySelected("popular")}
+                >
+                  Popular
+                </button>
+            </div>
+
+            <div className="flex justify-end mb-3">
               <button
-                className={`rounded-l-md border-[1px] border-r-[.5px] ${getButtonStyles(
-                  replySelected === "newest"
-                )}`}
-                onClick={() => setReplySelected("newest")}
+                type="button"
+                onClick={() =>
+                  setOnlyRepliesToOthersPosts((prev: boolean) => !prev)
+                }
+                className="flex items-center gap-2 text-xs text-neutral-600 select-none"
+                aria-pressed={onlyRepliesToOthersPosts}
               >
-                Newest
-              </button>
-              <button
-                className={`border-[1px] ${getButtonStyles(
-                  replySelected === "oldest"
-                )}`}
-                onClick={() => setReplySelected("oldest")}
-              >
-                Oldest
-              </button>
-              <button
-                className={`rounded-r-md border-[1px] border-l-[.5px] ${getButtonStyles(
-                  replySelected === "popular"
-                )}`}
-                onClick={() => setReplySelected("popular")}
-              >
-                Popular
+                <span>Exclude self post comments</span>
+                <span
+                  className={`w-4 h-4 rounded-[3px] border border-gray flex items-center justify-center ${
+                    onlyRepliesToOthersPosts ? "bg-[#5ac800]" : "bg-white"
+                  }`}
+                >
+                  {onlyRepliesToOthersPosts && (
+                    <svg
+                      width="10"
+                      height="8"
+                      viewBox="0 0 10 8"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M1 4L3.5 6.5L9 1"
+                        stroke="white"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </span>
               </button>
             </div>
 
@@ -633,8 +694,12 @@ export default function Home({
                         className="px-0 md:px-0"
                       />
                     </Link>
+                  ) : item.post?.DoNotShow ? (
+                    <div className="px-4 py-3 text-xs text-neutral-500">
+                      Original post is hidden or unavailable.
+                    </div>
                   ) : (
-                    <div className="px-2 py-3 text-xs text-neutral-500">
+                    <div className="px-4 py-3 text-xs text-neutral-500">
                       Original post not found.
                     </div>
                   )}
@@ -672,9 +737,13 @@ export default function Home({
               </div>
             )}
 
-            {!replies.fetching && replies.data?.length === 0 && !replies.error && (
+            {!replies.fetching &&
+              (replies.data?.length ?? 0) === 0 &&
+              !replies.error && (
               <h3 className="text-neutral-400 mt-[20px] font-normal text-base text-center">
-                No replies found.
+                {onlyRepliesToOthersPosts
+                  ? "No replies match this filter."
+                  : "No replies found."}
               </h3>
             )}
             <div className="flex justify-center items-center mt-4">

@@ -111,36 +111,80 @@ export type GetPostRepliesAllResult = {
 export const getPostRepliesAll = async ({
   postID,
   sortMode,
-  max = 5000,
+  max = 50000,
 }: {
   postID: string;
   sortMode: "newest" | "oldest";
   max?: number;
 }): Promise<GetPostRepliesAllResult> => {
-  // Fetch in a single query with an upper bound. If PostgREST/Supabase truncates results
-  // (e.g., max_rows), `total` will still let us detect that the response is incomplete.
-  const { data, error, count } = await supabaseAdmin
+  // Fetch ALL replies for a post (internally paginated) so scroll-to-reply is accurate.
+  // We use `count: exact` to know when we've retrieved everything, and we page with `range`
+  // to avoid PostgREST max_rows truncation.
+
+  const countResult = await supabaseAdmin
     .from("Replies")
     .select(
-      "Id, EmpathyCount, Feeling, GameCommunityIconUri, InReplyToId, GameCommunityTitle, GameId, IconUri, ImageUri, IsPlayed, IsSpoiler, PostedDate, ScreenName, ScreenShotUri, Text, TitleId, NNID, HideRequested, WarcLocation",
-      { count: "exact" }
+      "Id",
+      { count: "exact", head: true }
     )
-    .eq("InReplyToId", postID)
-    .range(0, Math.max(0, max - 1))
-    .order("PostedDate", { ascending: sortMode === "oldest" });
+    .eq("InReplyToId", postID);
 
-  if (error) {
-    console.log(error.message);
-    throw new Error(error.message);
+  if (countResult.error) {
+    console.log(countResult.error.message);
+    throw new Error(countResult.error.message);
+  }
+
+  const total = typeof (countResult as any).count === "number" ? (countResult as any).count : null;
+  const hardMax = Math.max(0, max);
+
+  // If count is unavailable for any reason, fall back to a conservative single-page fetch.
+  if (total == null) {
+    const { data, error } = await supabaseAdmin
+      .from("Replies")
+      .select(
+        "Id, EmpathyCount, Feeling, GameCommunityIconUri, InReplyToId, GameCommunityTitle, GameId, IconUri, ImageUri, IsPlayed, IsSpoiler, PostedDate, ScreenName, ScreenShotUri, Text, TitleId, NNID, HideRequested, WarcLocation"
+      )
+      .eq("InReplyToId", postID)
+      .range(0, Math.max(0, hardMax - 1))
+      .order("PostedDate", { ascending: sortMode === "oldest" });
+
+    if (error) {
+      console.log(error.message);
+      throw new Error(error.message);
+    }
+
+    const replies: Reply[] = [];
+    data?.map((value) => replies.push(convertReply(value)));
+    return { replies, total: null, hasMore: replies.length === hardMax };
   }
 
   const replies: Reply[] = [];
-  data?.map((value) => replies.push(convertReply(value)));
+  const pageSize = 1000;
+  const cappedTotal = Math.min(total, hardMax);
 
-  const total = typeof count === "number" ? count : null;
-  const hasMore =
-    total != null ? total > replies.length : replies.length === max;
+  const ascending = sortMode === "oldest";
 
+  for (let offset = 0; offset < cappedTotal; offset += pageSize) {
+    const end = Math.min(cappedTotal - 1, offset + pageSize - 1);
+    const { data, error } = await supabaseAdmin
+      .from("Replies")
+      .select(
+        "Id, EmpathyCount, Feeling, GameCommunityIconUri, InReplyToId, GameCommunityTitle, GameId, IconUri, ImageUri, IsPlayed, IsSpoiler, PostedDate, ScreenName, ScreenShotUri, Text, TitleId, NNID, HideRequested, WarcLocation"
+      )
+      .eq("InReplyToId", postID)
+      .range(offset, end)
+      .order("PostedDate", { ascending });
+
+    if (error) {
+      console.log(error.message);
+      throw new Error(error.message);
+    }
+
+    data?.forEach((value) => replies.push(convertReply(value)));
+  }
+
+  // If the post has more replies than our safety cap, signal that more exists.
+  const hasMore = total > replies.length;
   return { replies, total, hasMore };
 };
 
@@ -600,12 +644,83 @@ export const getUserRepliesWithPosts = async ({
   sortMode,
   limit = LIMIT.UserReplies,
   page = 1,
+  otherPostsOnly = false,
 }: {
   NNID: string;
   sortMode: "newest" | "oldest" | "popular";
   limit?: number;
   page?: number;
+  otherPostsOnly?: boolean;
 }): Promise<UserReplyFeedItem[]> => {
+  if (otherPostsOnly) {
+    const start = (page - 1) * limit;
+    const end = start + limit - 1;
+
+    const query = supabaseAdmin
+      .from("Replies")
+      .select(
+        [
+          "Id",
+          "EmpathyCount",
+          "Feeling",
+          "GameCommunityIconUri",
+          "InReplyToId",
+          "GameCommunityTitle",
+          "GameId",
+          "IconUri",
+          "ImageUri",
+          "IsPlayed",
+          "IsSpoiler",
+          "PostedDate",
+          "ScreenName",
+          "ScreenShotUri",
+          "Text",
+          "TitleId",
+          "NNID",
+          "HideRequested",
+          "WarcLocation",
+          // Embedded parent post
+          // Use INNER join so we never return rows without a parent post.
+          "post:Posts!Replies_InReplyToId_fkey!inner(Id, EmpathyCount, Feeling, GameCommunityIconUri, GameCommunityTitle, GameId, IconUri, ImageUri, IsPlayed, IsSpoiler, PostedDate, ReplyCount, ScreenName, ScreenShotUri, Text, Title, TitleId, VideoUrl, NNID, HideRequested, WarcLocation)",
+        ].join(",")
+      )
+      .eq("NNID", NNID)
+      // Also exclude replies where the in-reply-to id isn't present (defensive; some DBs might not enforce FK).
+      .neq("InReplyToId", "")
+      // Filter must happen in SQL (before pagination), otherwise page 1 for "newest"
+      // could be empty simply because the newest replies are on the user's own posts.
+      .neq("post.NNID", NNID)
+      .range(start, end);
+
+    if (sortMode === "newest") {
+      query.order("PostedDate", { ascending: false });
+    } else if (sortMode === "oldest") {
+      query.order("PostedDate", { ascending: true });
+    } else {
+      query.order("EmpathyCount", { ascending: false });
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.log(error.message);
+      throw new Error(error.message);
+    }
+
+    const items: UserReplyFeedItem[] = [];
+    data?.forEach((row: any) => {
+      const reply = convertReply(row);
+      const post = row?.post ? convertPost(row.post) : null;
+      // INNER join should guarantee `row.post`, but keep a small guard for safety.
+      // IMPORTANT: do NOT filter on `post.ID` here — hidden posts intentionally become `ID: null`
+      // via `convertPost()`, and we still want to return them so the UI can show
+      // "Original post is hidden or unavailable."
+      if (post) items.push({ reply, post });
+    });
+
+    return items;
+  }
+
   const replies = await getUserReplies({ NNID, sortMode, limit, page });
   const postIDs = replies.map((r) => r.ReplyingToID).filter(Boolean);
   const postsByID = await getPostsByIDs(postIDs);
