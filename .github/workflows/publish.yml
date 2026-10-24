@@ -51,6 +51,7 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v6
         with:
+          context: ./website
           platforms: linux/amd64
           push: ${{ env.SHOULD_PUSH_IMAGE }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -94,6 +95,7 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v6
         with:
+          context: ./website
           platforms: linux/arm64
           push: ${{ env.SHOULD_PUSH_IMAGE }}
           tags: ${{ steps.meta.outputs.tags }}
